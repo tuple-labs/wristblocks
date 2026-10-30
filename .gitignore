@@ -1,0 +1,18 @@
+# generated on the build machine
+apple/*.xcodeproj/
+apple/build/
+apple/Tally/Info.plist
+.DS_Store
+# never commit signing material or credentials
+*.p12
+*.mobileprovision
+*.cer
+*.key
+*.pem
+.env*
+# local AI agent / plugin state, may contain private session data
+.claude/
+.claude-flow/
+.swarm/
+*.db
+*.sqlite
