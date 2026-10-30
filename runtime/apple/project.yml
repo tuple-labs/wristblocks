@@ -1,24 +1,26 @@
-# Xcode project is generated on the build machine (xcodegen), so no .xcodeproj lives in the repo.
+# Generated into an Xcode project on the build machine. APP_NAME and APP_ID come from tools/validate.py.
 name: WristBlocks
 options:
   bundleIdPrefix: org.tuplelabs.wristblocks
   deploymentTarget:
     watchOS: "10.0"
 targets:
-  Tally:
+  WristApp:
     type: application
     platform: watchOS
-    sources: [Tally]
+    sources:
+      - App
     info:
-      path: Tally/Info.plist
+      path: App/Info.plist
       properties:
-        CFBundleDisplayName: Tally
-        CFBundleShortVersionString: "0.1.0"
+        CFBundleDisplayName: ${APP_NAME}
+        CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "1"
         WKApplication: true
         WKWatchOnly: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.tuplelabs.wristblocks.tally
+        PRODUCT_NAME: WristApp
+        PRODUCT_BUNDLE_IDENTIFIER: org.tuplelabs.wristblocks.${APP_ID}
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "4"

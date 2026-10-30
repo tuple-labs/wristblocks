@@ -1,0 +1,10 @@
+{
+  "name": "Tally",
+  "id": "tally",
+  "color": "#F2C46D",
+  "blocks": [
+    { "type": "title", "text": "Tally" },
+    { "type": "counter", "label": "Count", "goal": 33, "step": 1, "gesture": true },
+    { "type": "text", "text": "Double tap or double pinch to count" }
+  ]
+}

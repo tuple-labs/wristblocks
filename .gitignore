@@ -16,3 +16,14 @@ apple/Tally/Info.plist
 .swarm/
 *.db
 *.sqlite
+# build outputs
+out/
+runtime/wearos/.gradle/
+runtime/wearos/build/
+runtime/wearos/app/build/
+runtime/wearos/local.properties
+runtime/apple/App/app.json
+runtime/apple/build/
+runtime/apple/*.xcodeproj/
+*.apk
+*.log

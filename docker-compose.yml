@@ -1,0 +1,19 @@
+# Usage:
+#   docker compose up                                   -> editor on http://localhost:8080
+#   docker compose run --rm box build apps/tally.json   -> out/tally-wearos.apk
+services:
+  box:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    # Android build tools are x86_64 only; on Apple Silicon this runs through Rosetta or emulation.
+    platform: linux/amd64
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/work
+      - gradle-cache:/cache/gradle
+    command: ["editor"]
+
+volumes:
+  gradle-cache:

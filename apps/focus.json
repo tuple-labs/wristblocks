@@ -1,0 +1,11 @@
+{
+  "name": "Focus",
+  "id": "focus",
+  "color": "#3FD0B6",
+  "blocks": [
+    { "type": "title", "text": "Focus" },
+    { "type": "timer", "label": "Deep work", "minutes": 25, "gesture": true },
+    { "type": "counter", "label": "Sessions", "goal": 4, "step": 1 },
+    { "type": "text", "text": "Start the timer with a double tap" }
+  ]
+}

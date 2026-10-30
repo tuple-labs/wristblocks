@@ -1,0 +1,155 @@
+name: Build watch apps
+
+# Every file in apps/ becomes an Apple Watch app and a Wear OS app.
+on:
+  push:
+    branches: [main]
+    paths: ["apps/**", "runtime/**", "tools/**", ".github/workflows/build.yml"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check app files
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.list.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - name: Validator self test
+        run: python3 tools/validate.py --selftest
+      - name: Validate every app file
+        id: list
+        run: |
+          set -e
+          ids=()
+          for f in apps/*.json; do
+            id=$(python3 tools/validate.py "$f" | sed -n 's/^APP_ID=//p')
+            # the file name must match the app id, so downloads and releases line up
+            if [ "$id" != "$(basename "$f" .json)" ]; then echo "::error file=$f::rename this file to apps/$id.json"; exit 1; fi
+            ids+=("$id")
+          done
+          printf 'apps=%s\n' "$(printf '%s\n' "${ids[@]}" | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')" >> "$GITHUB_OUTPUT"
+
+  wearos:
+    name: Wear OS (${{ matrix.app }})
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.check.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: Android SDK pieces
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;36.0.0" > /dev/null
+      - name: Validate app file
+        run: WRISTBLOCKS_CLEAN_JSON="$RUNNER_TEMP/app.json" python3 tools/validate.py --github-env "apps/${{ matrix.app }}.json"
+      - name: Build
+        working-directory: runtime/wearos
+        run: ./gradlew --no-daemon -q assembleRelease -PappJson="$RUNNER_TEMP/app.json"
+      - name: Name the app file
+        run: cp runtime/wearos/app/build/outputs/apk/release/app-release.apk "${APP_ID}-wearos.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-wearos
+          path: ${{ matrix.app }}-wearos.apk
+          retention-days: 14
+
+  watchos:
+    name: Apple Watch (${{ matrix.app }})
+    needs: check
+    runs-on: macos-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.check.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - name: Validate app file
+        run: WRISTBLOCKS_CLEAN_JSON=runtime/apple/App/app.json python3 tools/validate.py --github-env "apps/${{ matrix.app }}.json"
+      - name: Generate Xcode project
+        working-directory: runtime/apple
+        run: |
+          brew install xcodegen > /dev/null
+          xcodegen generate --quiet
+      # Unsigned on purpose: signing happens on the user's own machine, so no Apple credentials ever touch CI.
+      - name: Build for Apple Watch
+        working-directory: runtime/apple
+        run: |
+          xcodebuild -quiet -project WristBlocks.xcodeproj -scheme WristApp -configuration Release \
+            -sdk watchos -destination 'generic/platform=watchOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Build for the watch simulator
+        working-directory: runtime/apple
+        run: |
+          xcodebuild -quiet -project WristBlocks.xcodeproj -scheme WristApp -configuration Debug \
+            -sdk watchsimulator -destination 'generic/platform=watchOS Simulator' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Screenshot in the simulator
+        continue-on-error: true
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          watches = [x for rt, ds in d.items() if "watchOS" in rt for x in ds]
+          print(watches[-1]["udid"] if watches else "")')
+          test -n "$UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" runtime/apple/build/Build/Products/Debug-watchsimulator/WristApp.app
+          xcrun simctl launch "$UDID" "org.tuplelabs.wristblocks.${APP_ID}"
+          sleep 8
+          xcrun simctl io "$UDID" screenshot "${APP_ID}-apple-watch.png"
+      - name: Package
+        run: |
+          ditto -c -k --keepParent runtime/apple/build/Build/Products/Release-watchos/WristApp.app "${APP_ID}-applewatch-unsigned.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-applewatch
+          path: |
+            ${{ matrix.app }}-applewatch-unsigned.zip
+            ${{ matrix.app }}-apple-watch.png
+          retention-days: 14
+
+  release:
+    name: Publish downloads
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, wearos, watchos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.check.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: actions/download-artifact@v4
+        with: { pattern: "${{ matrix.app }}-*", merge-multiple: true, path: out }
+      - name: Update the release for this app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP: ${{ matrix.app }}
+        run: |
+          NAME=$(python3 -c "import json; print(json.load(open('apps/$APP.json'))['name'])")
+          TAG="app-$APP"
+          NOTES="Built from apps/$APP.json at ${GITHUB_SHA::7}. Wear OS: install the .apk. Apple Watch: see docs/install-apple-watch.md."
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 || \
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$NAME" --notes "$NOTES"
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes "$NOTES"
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber out/*

@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WristBlocks Editor</title>
+<meta name="description" content="Snap blocks together to make a smartwatch app for Apple Watch and Wear OS.">
+<script src="https://cdn.jsdelivr.net/npm/blockly@13.4.0/blockly.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f6f8; --panel: #ffffff; --ink: #17171c; --muted: #66667a; --line: #e2e2ea;
+    --accent: #c98a12; --accent-ink: #ffffff; --ok: #1a7f5a; --bad: #b42318;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111116; --panel: #1b1b22; --ink: #f1f1f5; --muted: #a0a0b0; --line: #2d2d37;
+      --accent: #f2c46d; --accent-ink: #2a1d00; --ok: #4fd1a1; --bad: #ff8a80;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 220px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100dvh - 58px); }
+  #blockly { min-height: 420px; }
+  aside { border-left: 1px solid var(--line); background: var(--panel); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .watch { width: 230px; height: 230px; margin: 4px auto 0; border-radius: 50%; background: #0b0f10; color: #f1f1ee;
+    border: 10px solid #2a2a33; box-shadow: 0 8px 30px rgba(0,0,0,.25); overflow-y: auto; padding: 30px 24px; text-align: center; scrollbar-width: none; }
+  .watch::-webkit-scrollbar { display: none; }
+  .w-title { font-weight: 650; font-size: 15px; margin: 2px 0 6px; }
+  .w-text { color: #b5b9b7; font-size: 11px; margin: 6px 0; }
+  .w-label { color: #b5b9b7; font-size: 10px; }
+  .w-big { font-size: 34px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .w-row { display: flex; gap: 6px; justify-content: center; margin: 4px 0 8px; }
+  .w-btn { border: 0; border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 12px; cursor: pointer; }
+  .w-btn.sec { background: #2a3033; color: #f1f1ee; }
+  .w-pinch { font-size: 9px; color: #b5b9b7; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type=text] { width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; width: 100%; }
+  .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .msg { font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--bg); }
+  .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
+  details { font-size: 13px; color: var(--muted); }
+  pre { background: var(--bg); padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 12px; color: var(--ink); }
+  ol { padding-left: 18px; margin: 6px 0; font-size: 13px; color: var(--muted); }
+  select { padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    #blockly { height: 60vh; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>WristBlocks</h1>
+  <p>Snap blocks together on the left. Your watch app appears on the right. Press <b>Build</b> to get it for Apple Watch and Wear OS.</p>
+  <label class="sr" for="example" style="margin:0">Start from</label>
+  <select id="example" aria-label="Start from an example">
+    <option value="tally">Example: Tally counter</option>
+    <option value="focus">Example: Focus timer</option>
+    <option value="blank">Blank app</option>
+  </select>
+</header>
+<main>
+  <div id="blockly" aria-label="Blocks workspace"></div>
+  <aside>
+    <div>
+      <div class="watch" id="watch" aria-label="Watch preview" role="img"></div>
+      <p style="text-align:center;font-size:12px;color:var(--muted);margin:6px 0 0">Live preview. The buttons work.</p>
+    </div>
+    <div id="status" class="msg" role="status" aria-live="polite"></div>
+    <div>
+      <label for="repo">Your copy of WristBlocks on GitHub</label>
+      <input type="text" id="repo" placeholder="your-name/wristblocks" autocomplete="off" spellcheck="false">
+    </div>
+    <button class="btn primary" id="build">Build my watch app</button>
+    <div class="row">
+      <button class="btn" id="download">Download app file</button>
+      <button class="btn" id="copy">Copy app file</button>
+    </div>
+    <details>
+      <summary>How building works (2 minutes)</summary>
+      <ol>
+        <li>On GitHub, press <b>Fork</b> on the WristBlocks page to get your own copy (free account).</li>
+        <li>In your copy, open the <b>Actions</b> tab once and press the green button to turn builds on.</li>
+        <li>Type your copy's name above (like <code>your-name/wristblocks</code>) and press <b>Build my watch app</b>.</li>
+        <li>GitHub opens with your app file ready. Press <b>Commit changes</b>.</li>
+        <li>About 10 minutes later your apps appear under <b>Releases</b> in your copy: one for Apple Watch, one for Wear OS.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>App file (what the blocks make)</summary>
+      <pre id="json"></pre>
+    </details>
+  </aside>
+</main>
+<script>
+const COLORS = [["Gold", "#F2C46D"], ["Teal", "#3FD0B6"], ["Rose", "#F4A7B9"], ["Ice", "#BFE3FF"], ["Ember", "#FF8A50"]];
+const EXAMPLES = {
+  tally: { name: "Tally", color: "#F2C46D", blocks: [
+    { type: "title", text: "Tally" },
+    { type: "counter", label: "Count", goal: 33, step: 1, gesture: true },
+    { type: "text", text: "Double tap or double pinch to count" } ] },
+  focus: { name: "Focus", color: "#3FD0B6", blocks: [
+    { type: "title", text: "Focus" },
+    { type: "timer", label: "Deep work", minutes: 25, gesture: true },
+    { type: "counter", label: "Sessions", goal: 4, step: 1, gesture: false },
+    { type: "text", text: "Start the timer with a double tap" } ] },
+  blank: { name: "My App", color: "#F2C46D", blocks: [{ type: "title", text: "Hello" }] },
+};
+
+Blockly.common.defineBlocksWithJsonArray([
+  { type: "wb_app", message0: "Watch app %1 colour %2", args0: [
+      { type: "field_input", name: "NAME", text: "My App" },
+      { type: "field_dropdown", name: "COLOR", options: COLORS } ],
+    message1: "%1", args1: [{ type: "input_statement", name: "BLOCKS", check: "wb" }],
+    colour: 40, tooltip: "Your app. Put blocks inside, top to bottom." },
+  { type: "wb_title", message0: "Title %1", args0: [{ type: "field_input", name: "TEXT", text: "Hello" }],
+    previousStatement: "wb", nextStatement: "wb", colour: 200, tooltip: "Big coloured heading" },
+  { type: "wb_text", message0: "Text %1", args0: [{ type: "field_input", name: "TEXT", text: "Some words" }],
+    previousStatement: "wb", nextStatement: "wb", colour: 200, tooltip: "Small grey text" },
+  { type: "wb_counter", message0: "Counter %1 goal %2 step %3 double tap %4", args0: [
+      { type: "field_input", name: "LABEL", text: "Count" },
+      { type: "field_number", name: "GOAL", value: 0, min: 0, max: 100000, precision: 1 },
+      { type: "field_number", name: "STEP", value: 1, min: 1, max: 1000, precision: 1 },
+      { type: "field_checkbox", name: "GESTURE", checked: false } ],
+    previousStatement: "wb", nextStatement: "wb", colour: 120,
+    tooltip: "A number that goes up when tapped. Goal 0 means no goal. Tick 'double tap' to count hands free." },
+  { type: "wb_timer", message0: "Timer %1 minutes %2 double tap %3", args0: [
+      { type: "field_input", name: "LABEL", text: "Timer" },
+      { type: "field_number", name: "MINUTES", value: 25, min: 1, max: 180, precision: 1 },
+      { type: "field_checkbox", name: "GESTURE", checked: false } ],
+    previousStatement: "wb", nextStatement: "wb", colour: 290,
+    tooltip: "Countdown with a buzz at the end. Tick 'double tap' to start and pause hands free." },
+]);
+
+const workspace = Blockly.inject("blockly", {
+  toolbox: { kind: "flyoutToolbox", contents: ["wb_title", "wb_text", "wb_counter", "wb_timer"].map(type => ({ kind: "block", type })) },
+  trashcan: true, zoom: { controls: true, startScale: 1.0 }, move: { scrollbars: true, drag: true, wheel: true },
+});
+
+function load(spec) {
+  Blockly.Events.disable();
+  workspace.clear();
+  const app = workspace.newBlock("wb_app");
+  app.setFieldValue(spec.name, "NAME");
+  app.setFieldValue(COLORS.some(c => c[1] === spec.color) ? spec.color : COLORS[0][1], "COLOR");
+  app.setDeletable(false);
+  let prev = null;
+  for (const b of spec.blocks) {
+    const blk = workspace.newBlock("wb_" + b.type);
+    if (b.text !== undefined) blk.setFieldValue(b.text, "TEXT");
+    if (b.label !== undefined) blk.setFieldValue(b.label, "LABEL");
+    if (b.goal !== undefined) blk.setFieldValue(b.goal, "GOAL");
+    if (b.step !== undefined) blk.setFieldValue(b.step, "STEP");
+    if (b.minutes !== undefined) blk.setFieldValue(b.minutes, "MINUTES");
+    if (b.gesture !== undefined) blk.setFieldValue(b.gesture ? "TRUE" : "FALSE", "GESTURE");
+    blk.initSvg(); blk.render();
+    (prev ? prev.nextConnection : app.getInput("BLOCKS").connection).connect(blk.previousStatement ? blk.previousConnection : blk.previousConnection);
+    prev = blk;
+  }
+  app.initSvg(); app.render(); app.moveBy(30, 30);
+  Blockly.Events.enable();
+  update();
+}
+
+const slug = s => { const t = s.toLowerCase().replace(/[^a-z0-9]/g, ""); return /^[a-z]/.test(t) ? t.slice(0, 31) : ("app" + t).slice(0, 31); };
+
+/** Reads the blocks into an app file and checks it with the same rules as tools/validate.py. */
+function toSpec() {
+  const app = workspace.getBlocksByType("wb_app")[0];
+  const errors = [];
+  const name = app.getFieldValue("NAME").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 .'&!?-]{0,23}$/.test(name)) errors.push("App name: 1 to 24 letters, digits or spaces.");
+  const blocks = [];
+  let gestures = 0;
+  for (let b = app.getInputTargetBlock("BLOCKS"); b; b = b.getNextBlock()) {
+    const t = b.type.slice(3);
+    const out = { type: t };
+    if (t === "title" || t === "text") out.text = b.getFieldValue("TEXT").trim();
+    if (t === "counter" || t === "timer") {
+      out.label = b.getFieldValue("LABEL").trim();
+      out.gesture = b.getFieldValue("GESTURE") === "TRUE";
+      gestures += out.gesture ? 1 : 0;
+    }
+    if (t === "counter") { out.goal = Number(b.getFieldValue("GOAL")); out.step = Number(b.getFieldValue("STEP")); }
+    if (t === "timer") out.minutes = Number(b.getFieldValue("MINUTES"));
+    for (const k of ["text", "label"]) if (k in out && (!out[k] || out[k].length > 40)) errors.push(`${t}: ${k} must be 1 to 40 characters.`);
+    blocks.push(out);
+  }
+  if (!blocks.length) errors.push("Put at least one block inside the app.");
+  if (blocks.length > 8) errors.push("Up to 8 blocks per app.");
+  if (gestures > 1) errors.push("Only one block can use double tap.");
+  return { spec: { name, id: slug(name), color: app.getFieldValue("COLOR"), blocks }, errors };
+}
+
+const state = {};
+const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+function render(spec) {
+  const w = document.getElementById("watch");
+  w.innerHTML = spec.blocks.map((b, i) => {
+    const key = spec.id + i;
+    if (b.type === "title") return `<div class="w-title" style="color:${spec.color}">${esc(b.text)}</div>`;
+    if (b.type === "text") return `<div class="w-text">${esc(b.text)}</div>`;
+    const pinch = b.gesture ? `<div class="w-pinch">double tap = ${b.type === "counter" ? "+" + b.step : "start"}</div>` : "";
+    if (b.type === "counter") {
+      const n = state[key] || 0, shown = b.goal ? n % b.goal : n;
+      return `<div class="w-label">${esc(b.label)}</div><div class="w-big">${shown}${b.goal ? `<span style="font-size:13px;color:#b5b9b7"> / ${b.goal}</span>` : ""}</div>
+        ${b.goal && n >= b.goal ? `<div class="w-text" style="margin:0">Rounds: ${Math.floor(n / b.goal)}</div>` : ""}
+        <div class="w-row"><button class="w-btn" style="background:${spec.color}" data-inc="${key}" data-step="${b.step}">+${b.step}</button>
+        <button class="w-btn sec" data-reset="${key}" aria-label="Reset">↺</button></div>${pinch}`;
+    }
+    const m = b.minutes;
+    return `<div class="w-label">${esc(b.label)}</div><div class="w-big">${m}:00</div>
+      <div class="w-row"><button class="w-btn" style="background:${spec.color}">Start</button><button class="w-btn sec" aria-label="Reset">↺</button></div>${pinch}`;
+  }).join("");
+}
+document.getElementById("watch").addEventListener("click", e => {
+  const inc = e.target.dataset.inc, reset = e.target.dataset.reset;
+  if (inc) state[inc] = (state[inc] || 0) + Number(e.target.dataset.step);
+  if (reset) state[reset] = 0;
+  if (inc || reset) update();
+});
+
+let current;
+function update() {
+  const { spec, errors } = toSpec();
+  current = errors.length ? null : spec;
+  render(spec);
+  document.getElementById("json").textContent = JSON.stringify(spec, null, 2);
+  const st = document.getElementById("status");
+  st.className = "msg " + (errors.length ? "bad" : "ok");
+  st.textContent = errors.length ? errors.join(" ") : `Ready: "${spec.name}" with ${spec.blocks.length} block${spec.blocks.length === 1 ? "" : "s"}.`;
+}
+workspace.addChangeListener(e => { if (!e.isUiEvent) update(); });
+
+const repoInput = document.getElementById("repo");
+try { repoInput.value = localStorage.getItem("wb.repo") || ""; } catch {}
+document.getElementById("build").onclick = () => {
+  if (!current) return update();
+  const repo = repoInput.value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
+  if (!/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(repo)) {
+    document.getElementById("status").className = "msg bad";
+    document.getElementById("status").textContent = "Type your copy's name first, like your-name/wristblocks (see 'How building works').";
+    return repoInput.focus();
+  }
+  try { localStorage.setItem("wb.repo", repo); } catch {}
+  const body = JSON.stringify(current, null, 2) + "\n";
+  window.open(`https://github.com/${repo}/new/main?filename=${encodeURIComponent("apps/" + current.id + ".json")}&value=${encodeURIComponent(body)}`, "_blank", "noopener");
+};
+document.getElementById("download").onclick = () => {
+  if (!current) return update();
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob([JSON.stringify(current, null, 2) + "\n"], { type: "application/json" })),
+    download: current.id + ".json" });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+document.getElementById("copy").onclick = async () => {
+  if (!current) return update();
+  try { await navigator.clipboard.writeText(JSON.stringify(current, null, 2)); document.getElementById("status").textContent = "App file copied."; } catch {}
+};
+document.getElementById("example").onchange = e => { for (const k in state) delete state[k]; load(EXAMPLES[e.target.value]); };
+load(EXAMPLES.tally);
+</script>
+</body>
+</html>
