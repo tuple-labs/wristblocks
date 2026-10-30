@@ -4,6 +4,12 @@
 
 ![Snapping blocks together in the WristBlocks editor, with a live watch preview](docs/editor.gif)
 
+<p>
+  <img src="docs/screens/tally-apple-watch.png" width="200" alt="Tally example running on Apple Watch: gold title, counter ring and +1 button">
+  <img src="docs/screens/focus-apple-watch.png" width="200" alt="Focus example running on Apple Watch: 25 minute timer with Start button">
+</p>
+<sub>The two example apps, built from their block files by GitHub Actions and running in Apple's watch simulator.</sub>
+
 [**Open the editor**](https://tuple-labs.github.io/wristblocks/) · [Download the example apps](../../releases) · [Install on Apple Watch](docs/install-apple-watch.md) · [Install on Wear OS](docs/install-wear-os.md)
 
 ---
